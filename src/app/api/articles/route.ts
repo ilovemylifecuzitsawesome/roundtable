@@ -1,28 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { ArticleWithStats } from "@/types";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const userId = session?.user?.id;
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
 
     const articles = await db.article.findMany({
       where: { isActive: true },
       orderBy: { publishedAt: "desc" },
       include: {
-        votes: true,
         comments: {
           select: { id: true },
         },
-        ...(userId && {
-          votes: {
-            where: { userId },
-            select: { voteType: true },
-          },
-        }),
       },
     });
 

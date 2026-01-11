@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { z } from "zod";
 
@@ -20,24 +19,25 @@ const profileSchema = z.object({
 
 export async function PATCH(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
     const { aliasType, aliasYears } = profileSchema.parse(body);
 
-    const user = await db.user.update({
-      where: { id: session.user.id },
+    const updatedUser = await db.user.update({
+      where: { id: user.id },
       data: {
         aliasType,
         aliasYears: aliasType === "OTHER" ? null : aliasYears,
       },
     });
 
-    return NextResponse.json({ user });
+    return NextResponse.json({ user: updatedUser });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });

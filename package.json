@@ -11,16 +11,20 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "ingest": "tsx src/jobs/ingest.ts",
+    "ingest:watch": "tsx watch src/jobs/ingest.ts"
   },
   "dependencies": {
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "@prisma/client": "^5.14.0",
-    "@auth/prisma-adapter": "^2.0.0",
-    "next-auth": "^4.24.0",
-    "nodemailer": "^6.9.0",
+    "@supabase/supabase-js": "^2.43.0",
+    "@supabase/ssr": "^0.3.0",
+    "@xenova/transformers": "^2.17.0",
+    "rss-parser": "^3.13.0",
+    "cheerio": "^1.0.0",
     "date-fns": "^3.6.0",
     "clsx": "^2.1.0",
     "zod": "^3.23.0"
@@ -29,7 +33,6 @@
     "@types/node": "^20.12.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "@types/nodemailer": "^6.4.0",
     "typescript": "^5.4.0",
     "tailwindcss": "^3.4.0",
     "postcss": "^8.4.0",

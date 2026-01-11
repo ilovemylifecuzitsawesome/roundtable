@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { formatAlias, CommentWithAlias } from "@/types";
@@ -65,9 +64,10 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -75,7 +75,7 @@ export async function POST(
     const vote = await db.vote.findUnique({
       where: {
         userId_articleId: {
-          userId: session.user.id,
+          userId: user.id,
           articleId: params.id,
         },
       },
@@ -94,7 +94,7 @@ export async function POST(
     const comment = await db.comment.create({
       data: {
         content,
-        userId: session.user.id,
+        userId: user.id,
         articleId: params.id,
       },
     });

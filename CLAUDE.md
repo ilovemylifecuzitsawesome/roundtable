@@ -4,13 +4,14 @@ This document provides guidance for AI assistants working on the Roundtable PA c
 
 ## Project Overview
 
-**Roundtable PA** is an anonymous, nonbiased real-time political social media platform focused on Pennsylvania. Users engage with summarized news through voting and commenting, identified only by experience-based aliases.
+**Roundtable PA** is an anonymous, nonbiased real-time political social media platform focused on Pennsylvania. The platform automatically ingests news from PA sources, uses ML to filter and summarize articles, and allows users to engage through voting and commenting.
 
 ### Core Concepts
 
-- **Anonymity**: Users are identified by aliases like "5 yr PA resident", not names
+- **Anonymity**: Users identified by aliases like "5 yr PA resident", not names
 - **Vote-first engagement**: Must vote before commenting on articles
-- **Summarized content**: Articles have title, who should care, summary, impact
+- **AI-summarized content**: Articles auto-generated with title, who should care, summary, impact
+- **Real-time feed**: Auto-updating with new articles from PA news sources
 - **Nonpartisan design**: UI uses neutral colors, avoids party associations
 
 ## Tech Stack
@@ -19,7 +20,9 @@ This document provides guidance for AI assistants working on the Roundtable PA c
 - **TypeScript** for type safety
 - **Tailwind CSS** for styling
 - **Prisma** with SQLite for database
-- **NextAuth.js** for magic link authentication
+- **Supabase** for authentication (magic links) and real-time subscriptions
+- **Transformers.js** for on-device ML (summarization, classification)
+- **RSS Parser + Cheerio** for news ingestion
 - **Zod** for validation
 
 ## Project Structure
@@ -28,29 +31,41 @@ This document provides guidance for AI assistants working on the Roundtable PA c
 roundtable/
 ├── prisma/
 │   ├── schema.prisma        # Database models
-│   └── seed.ts              # Sample PA articles
+│   └── seed.ts              # Feed sources + sample articles
 ├── src/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── articles/    # Article CRUD, voting, comments
-│   │   │   ├── auth/        # NextAuth handler
-│   │   │   └── profile/     # User alias management
-│   │   ├── auth/            # Sign in/verify pages
+│   │   │   ├── profile/     # User alias management
+│   │   │   └── user/        # User profile lookup
+│   │   ├── auth/
+│   │   │   ├── signin/      # Magic link sign in
+│   │   │   └── callback/    # Auth callback handler
 │   │   ├── profile/         # Profile setup page
-│   │   ├── layout.tsx       # Root layout with providers
-│   │   ├── page.tsx         # Main feed
+│   │   ├── layout.tsx       # Root layout
+│   │   ├── page.tsx         # Main feed with real-time
 │   │   ├── globals.css      # Tailwind + custom styles
-│   │   └── providers.tsx    # SessionProvider wrapper
+│   │   └── providers.tsx    # Auth context provider
 │   ├── components/
 │   │   ├── Header.tsx       # Navigation with auth state
 │   │   ├── ArticleCard.tsx  # Article display with voting
 │   │   ├── VoteButtons.tsx  # Approve/Neutral/Disapprove
-│   │   └── CommentSection.tsx # Vote-gated comments
+│   │   └── CommentSection.tsx
 │   ├── lib/
-│   │   ├── auth.ts          # NextAuth configuration
-│   │   └── db.ts            # Prisma client singleton
+│   │   ├── db.ts            # Prisma client singleton
+│   │   ├── supabase/        # Supabase client utilities
+│   │   │   ├── client.ts    # Browser client
+│   │   │   ├── server.ts    # Server client
+│   │   │   └── middleware.ts
+│   │   └── ml/
+│   │       ├── summarizer.ts # ML summarization + scoring
+│   │       └── fetcher.ts    # RSS feed fetching
+│   ├── jobs/
+│   │   └── ingest.ts        # Background ingestion job
 │   └── types/
-│       └── index.ts         # Type definitions + helpers
+│       └── index.ts         # Type definitions
+├── middleware.ts            # Supabase session handling
+└── ...config files
 ```
 
 ## Key Commands
@@ -59,154 +74,158 @@ roundtable/
 npm run dev          # Start development server
 npm run build        # Build for production
 npm run lint         # Run ESLint
+
+# Database
 npm run db:generate  # Generate Prisma client
 npm run db:push      # Push schema to database
-npm run db:seed      # Seed sample articles
+npm run db:seed      # Seed feed sources + sample articles
 npm run db:studio    # Open Prisma Studio
+
+# Article Ingestion
+npm run ingest       # Run single ingestion cycle
+npm run ingest:watch # Continuous ingestion (every 5 min)
 ```
 
 ## Database Schema
 
 ### Models
 
-- **User**: Auth + alias (aliasType, aliasYears)
-- **Article**: Summarized news (title, whoShouldCare, summary, impact)
+- **User**: Supabase auth ID + alias (aliasType, aliasYears)
+- **FeedSource**: RSS feed URLs for PA news sources
+- **RawArticle**: Unprocessed articles from RSS feeds
+- **Article**: ML-summarized articles shown to users
 - **Vote**: APPROVE/DISAPPROVE/NEUTRAL per user per article
 - **Comment**: Text content, linked to user vote
 
-### Key Constraints
+### Processing Pipeline
 
-- One vote per user per article (`@@unique([userId, articleId])`)
-- Comments require prior vote (enforced in API)
-- Alias shown instead of user identity
-
-## UI/UX Patterns
-
-### Color Palette
-
-- `civic-*`: Neutral slate colors for UI
-- `approve`: Muted green (#059669)
-- `disapprove`: Muted red (#dc2626)
-- `neutral`: Gray (#6b7280)
-
-### Component Classes
-
-```css
-.btn-primary    /* Dark civic button */
-.btn-secondary  /* Light civic button */
-.card           /* White rounded container */
-.input          /* Form input styling */
-.vote-btn-*     /* Vote button variants */
+```
+FeedSource → RawArticle → (ML scoring) → (ML summarization) → Article
+    RSS         PENDING      APPROVED        SUMMARIZED
+                REJECTED
+                ERROR
 ```
 
-### Article Card Layout
+## ML Pipeline
 
-1. Category tag + Region + Time
-2. Title (prominent)
-3. "Who should care" line
-4. Summary paragraph
-5. Impact box (highlighted)
-6. Source attribution
-7. Vote buttons
-8. Expandable comments
+### Relevance Scoring (`src/lib/ml/summarizer.ts`)
+
+Uses keyword matching to score PA relevance (0-1):
+- PA keywords: philadelphia, pittsburgh, harrisburg, septa, etc.
+- Political keywords: election, legislation, budget, etc.
+- Threshold: 0.3 minimum to process
+
+### Summarization
+
+Uses Transformers.js with `Xenova/distilbart-cnn-6-6`:
+- Generates concise summary (30-80 tokens)
+- Extracts "who should care" audience
+- Generates impact statement
+- Detects region and category
+
+### Feed Sources
+
+Pre-configured PA news sources:
+- Philadelphia Inquirer
+- Pittsburgh Post-Gazette
+- PennLive
+- WHYY
+- WESA Pittsburgh
+- Spotlight PA
+
+## Authentication (Supabase)
+
+### Flow
+1. User enters email on `/auth/signin`
+2. Supabase sends magic link email
+3. User clicks link → `/auth/callback`
+4. Callback creates/updates user in Prisma DB
+5. Session stored in cookies
+
+### Context
+`useAuth()` hook provides:
+- `user`: Supabase user object
+- `profile`: User profile with alias
+- `isLoading`: Auth state loading
+- `signOut()`: Sign out function
+- `refreshProfile()`: Reload profile data
+
+## Real-time Updates
+
+Main feed subscribes to Supabase real-time:
+```typescript
+supabase
+  .channel("articles")
+  .on("postgres_changes", { event: "INSERT", table: "Article" }, ...)
+  .subscribe();
+```
 
 ## API Routes
 
 ### GET /api/articles
-Returns articles with vote stats and user's vote/comment status
+Returns articles with vote stats and user's vote status
 
 ### POST /api/articles/[id]/vote
 Body: `{ voteType: "APPROVE" | "DISAPPROVE" | "NEUTRAL" }`
-Requires auth, one vote per article
 
-### GET /api/articles/[id]/comments
-Returns comments with user aliases and vote badges
-
-### POST /api/articles/[id]/comments
-Body: `{ content: string }`
-Requires auth + prior vote on article
+### GET/POST /api/articles/[id]/comments
+GET: Returns comments with aliases
+POST: `{ content: string }` (requires prior vote)
 
 ### PATCH /api/profile
 Body: `{ aliasType: AliasType, aliasYears?: number }`
-Updates user's anonymous alias
 
-## Alias Types
+### GET /api/user/[id]
+Returns user profile for auth context
 
-```typescript
-enum AliasType {
-  PA_RESIDENT       // "X yr PA resident"
-  COLLEGE_STUDENT   // "X yr college student"
-  POLI_SCI_WORKER   // "X yr poli sci worker"
-  GOVT_WORKER       // "X yr govt worker"
-  JOURNALIST        // "X yr journalist"
-  EDUCATOR          // "X yr educator"
-  HEALTHCARE        // "X yr healthcare worker"
-  OTHER             // "community member"
-}
+## Environment Variables
+
+```bash
+# Database
+DATABASE_URL="file:./dev.db"
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL="https://xxx.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="xxx"
+SUPABASE_SERVICE_ROLE_KEY="xxx"
+
+# App
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
 ## Development Guidelines
 
-### Adding New Features
+### Adding New Feed Sources
 
-1. Update Prisma schema if needed (`prisma/schema.prisma`)
-2. Run `npm run db:generate` and `npm run db:push`
-3. Add types to `src/types/index.ts`
-4. Create API routes in `src/app/api/`
-5. Build components in `src/components/`
-6. Use existing Tailwind classes and patterns
+1. Add to `PA_NEWS_FEEDS` in `src/lib/ml/fetcher.ts`
+2. Run `npm run db:seed` to add to database
+3. Or add directly via Prisma Studio
+
+### Improving ML Accuracy
+
+- Adjust `PA_KEYWORDS` and `POLITICAL_KEYWORDS` in `summarizer.ts`
+- Modify `RELEVANCE_THRESHOLD` (default: 0.3)
+- Update category detection logic
 
 ### Security Considerations
 
-- All API routes check session authentication
+- All API routes verify Supabase session
 - Vote-before-comment enforced server-side
 - User emails never exposed in responses
 - Input validated with Zod schemas
-- Aliases are experience-based, not identifying
 
-### Civic Design Principles
+## Code Style
 
-1. **Accessibility**: Ensure features work for all users
-2. **Neutrality**: Avoid colors/language suggesting political bias
-3. **Privacy**: Only show aliases, never emails/names
-4. **Transparency**: Show vote distributions after voting
-5. **Engagement**: Low barrier to participate (magic links)
-
-## Code Style Conventions
-
-1. **Naming Conventions**
-   - Variables and functions: `camelCase`
-   - Components and classes: `PascalCase`
-   - Constants: `SCREAMING_SNAKE_CASE`
-   - Files: Match the export name (e.g., `ArticleCard.tsx`)
-
-2. **Code Organization**
-   - Keep files focused and single-purpose
-   - Prefer composition over inheritance
-   - Extract reusable logic into utility functions
-
-3. **Comments**
-   - Write self-documenting code where possible
-   - Add comments for complex business logic
+- Variables/functions: `camelCase`
+- Components/classes: `PascalCase`
+- Constants: `SCREAMING_SNAKE_CASE`
+- Files: Match export name
 
 ## Git Workflow
 
-1. **Branch Naming**
-   - Feature branches: `feature/<description>`
-   - Bug fixes: `fix/<description>`
-   - Claude sessions: `claude/<session-id>`
-
-2. **Commit Messages**
-   - Use present tense: "Add feature" not "Added feature"
-   - Be concise but descriptive
-
-## Future Considerations
-
-- Real-time updates with SSE or WebSockets
-- Admin panel for article management
-- Content moderation system
-- Expanded regions beyond PA
-- Mobile app version
+- Feature branches: `feature/<description>`
+- Bug fixes: `fix/<description>`
+- Claude sessions: `claude/<session-id>`
 
 ---
 

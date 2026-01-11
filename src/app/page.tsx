@@ -1,14 +1,14 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/app/providers";
 import { useState, useEffect, useCallback } from "react";
 import { ArticleWithStats } from "@/types";
 import { VoteType } from "@prisma/client";
 import { ArticleCard } from "@/components/ArticleCard";
-import { ArticleFeed } from "@/components/ArticleFeed";
+import { createClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
-  const { data: session, status } = useSession();
+  const { user, profile, isLoading: authLoading } = useAuth();
   const [articles, setArticles] = useState<ArticleWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
@@ -27,6 +27,24 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchArticles();
+
+    // Set up real-time subscription for new articles
+    const supabase = createClient();
+    const channel = supabase
+      .channel("articles")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "Article" },
+        () => {
+          // Refresh when new article is added
+          fetchArticles();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchArticles]);
 
   const handleVote = async (articleId: string, voteType: VoteType) => {
@@ -37,7 +55,6 @@ export default function HomePage() {
     });
 
     if (res.ok) {
-      // Refresh articles to get updated stats
       await fetchArticles();
     }
   };
@@ -54,7 +71,6 @@ export default function HomePage() {
     }
   };
 
-  // Get unique regions for filtering
   const regions = [
     "all",
     ...new Set(articles.map((a) => a.region).filter(Boolean)),
@@ -68,7 +84,7 @@ export default function HomePage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Hero Section for non-authenticated users */}
-      {status !== "loading" && !session && (
+      {!authLoading && !user && (
         <div className="card p-8 mb-8 text-center bg-gradient-to-br from-civic-800 to-civic-900 text-white">
           <h1 className="text-3xl font-bold mb-3">
             Civic Discourse for Pennsylvania
@@ -77,14 +93,17 @@ export default function HomePage() {
             Join the Roundtable to discuss PA politics anonymously. Vote on
             issues, share your perspective, and see where your community stands.
           </p>
-          <a href="/auth/signin" className="btn bg-white text-civic-800 hover:bg-civic-100">
+          <a
+            href="/auth/signin"
+            className="btn bg-white text-civic-800 hover:bg-civic-100"
+          >
             Join the discussion
           </a>
         </div>
       )}
 
       {/* Onboarding prompt for users without alias */}
-      {session && !session.user.aliasType && (
+      {user && !profile?.aliasType && (
         <div className="card p-6 mb-6 border-2 border-civic-300 bg-civic-50">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -145,7 +164,7 @@ export default function HomePage() {
               article={article}
               onVote={handleVote}
               onComment={handleComment}
-              isAuthenticated={!!session}
+              isAuthenticated={!!user}
             />
           ))}
         </div>

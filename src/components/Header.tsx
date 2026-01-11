@@ -1,11 +1,11 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useAuth } from "@/app/providers";
 import Link from "next/link";
 import { formatAlias } from "@/types";
 
 export function Header() {
-  const { data: session, status } = useSession();
+  const { user, profile, isLoading, signOut } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-civic-200">
@@ -18,15 +18,15 @@ export function Header() {
         </Link>
 
         <nav className="flex items-center gap-4">
-          {status === "loading" ? (
+          {isLoading ? (
             <div className="h-8 w-24 bg-civic-100 rounded animate-pulse" />
-          ) : session ? (
+          ) : user ? (
             <div className="flex items-center gap-3">
               <Link
                 href="/profile"
                 className="text-sm text-civic-600 hover:text-civic-800"
               >
-                {formatAlias(session.user.aliasType, session.user.aliasYears)}
+                {formatAlias(profile?.aliasType, profile?.aliasYears)}
               </Link>
               <button
                 onClick={() => signOut()}

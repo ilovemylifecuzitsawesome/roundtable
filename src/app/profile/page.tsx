@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/app/providers";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AliasType } from "@prisma/client";
@@ -50,7 +50,7 @@ const ALIAS_OPTIONS: { value: AliasType; label: string; description: string }[] 
 ];
 
 export default function ProfilePage() {
-  const { data: session, status, update } = useSession();
+  const { user, profile, isLoading, refreshProfile } = useAuth();
   const router = useRouter();
 
   const [aliasType, setAliasType] = useState<AliasType | "">("");
@@ -59,14 +59,14 @@ export default function ProfilePage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (!isLoading && !user) {
       router.push("/auth/signin");
     }
-    if (session?.user) {
-      setAliasType(session.user.aliasType || "");
-      setAliasYears(session.user.aliasYears || 1);
+    if (profile) {
+      setAliasType(profile.aliasType || "");
+      setAliasYears(profile.aliasYears || 1);
     }
-  }, [session, status, router]);
+  }, [user, profile, isLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +83,7 @@ export default function ProfilePage() {
       });
 
       if (res.ok) {
-        await update();
+        await refreshProfile();
         setMessage("Profile updated successfully!");
       } else {
         setMessage("Failed to update profile.");
@@ -95,7 +95,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (status === "loading") {
+  if (isLoading) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
         <div className="text-civic-400">Loading...</div>

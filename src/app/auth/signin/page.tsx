@@ -1,12 +1,13 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,16 +15,18 @@ export default function SignInPage() {
     setError("");
 
     try {
-      const result = await signIn("email", {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
         email,
-        redirect: false,
-        callbackUrl: "/",
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
-      if (result?.error) {
-        setError("Failed to send magic link. Please try again.");
+      if (error) {
+        setError(error.message);
       } else {
-        window.location.href = "/auth/verify";
+        setSuccess(true);
       }
     } catch {
       setError("Something went wrong. Please try again.");
@@ -31,6 +34,42 @@ export default function SignInPage() {
       setIsLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          <div className="card p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-approve/20 flex items-center justify-center mx-auto mb-4">
+              <svg
+                className="w-8 h-8 text-approve"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-civic-900 mb-2">
+              Check your email
+            </h1>
+            <p className="text-civic-600">
+              We sent a magic link to <strong>{email}</strong>. Click the link
+              to sign in.
+            </p>
+            <p className="text-sm text-civic-500 mt-4">
+              Didn&apos;t receive it? Check your spam folder.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4">
