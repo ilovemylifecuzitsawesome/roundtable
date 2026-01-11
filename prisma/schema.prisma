@@ -14,23 +14,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Anonymous alias system
-  aliasType  AliasType?
+  // Anonymous alias system (stored as string for SQLite)
+  aliasType  String?  // PA_RESIDENT, COLLEGE_STUDENT, etc.
   aliasYears Int?
 
   votes    Vote[]
   comments Comment[]
-}
-
-enum AliasType {
-  PA_RESIDENT
-  COLLEGE_STUDENT
-  POLI_SCI_WORKER
-  GOVT_WORKER
-  JOURNALIST
-  EDUCATOR
-  HEALTHCARE
-  OTHER
 }
 
 // Raw articles from RSS feeds (before processing)
@@ -45,24 +34,15 @@ model RawArticle {
   sourceContent String? // Full text if available
   publishedAt DateTime?
 
-  // Processing status
-  status      ProcessingStatus @default(PENDING)
-  relevanceScore Float?        // 0-1 score from ML
+  // Processing status (stored as string for SQLite)
+  status      String   @default("PENDING") // PENDING, PROCESSING, APPROVED, REJECTED, SUMMARIZED, ERROR
+  relevanceScore Float?
   processedAt DateTime?
   errorMessage String?
 
   // Link to processed article if approved
   articleId   String?  @unique
   article     Article? @relation(fields: [articleId], references: [id])
-}
-
-enum ProcessingStatus {
-  PENDING      // Waiting to be processed
-  PROCESSING   // Currently being analyzed
-  APPROVED     // Relevant, will be summarized
-  REJECTED     // Not relevant enough
-  SUMMARIZED   // Summarized and published
-  ERROR        // Processing failed
 }
 
 // Processed articles (shown to users)
@@ -73,16 +53,16 @@ model Article {
   publishedAt DateTime @default(now())
 
   // AI-generated content
-  title         String  // Concise title
-  whoShouldCare String  // "PA voters", "Pittsburgh residents", etc.
-  summary       String  // 2-3 sentence summary
-  impact        String  // Brief impact statement
+  title         String
+  whoShouldCare String
+  summary       String
+  impact        String
 
   // Source metadata
   sourceUrl  String?
   sourceName String?
-  category   String?  // Education, Healthcare, Elections, etc.
-  region     String?  // Philadelphia, Pittsburgh, Statewide, etc.
+  category   String?
+  region     String?
 
   // Status
   isActive Boolean @default(true)
@@ -91,10 +71,6 @@ model Article {
   rawArticle RawArticle?
   votes      Vote[]
   comments   Comment[]
-
-  @@index([publishedAt(sort: Desc)])
-  @@index([region])
-  @@index([category])
 }
 
 model Vote {
@@ -102,7 +78,7 @@ model Vote {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  voteType VoteType
+  voteType String // APPROVE, DISAPPROVE, NEUTRAL
 
   userId    String
   articleId String
@@ -111,12 +87,6 @@ model Vote {
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, articleId])
-}
-
-enum VoteType {
-  APPROVE
-  DISAPPROVE
-  NEUTRAL
 }
 
 model Comment {
@@ -131,8 +101,6 @@ model Comment {
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  @@index([articleId, createdAt])
 }
 
 // RSS feed sources
@@ -141,10 +109,10 @@ model FeedSource {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  name      String   // "Philadelphia Inquirer"
-  url       String   @unique // RSS feed URL
-  region    String?  // Default region for articles
-  category  String?  // Default category
+  name      String
+  url       String   @unique
+  region    String?
+  category  String?
   isActive  Boolean  @default(true)
   lastFetchedAt DateTime?
 }
