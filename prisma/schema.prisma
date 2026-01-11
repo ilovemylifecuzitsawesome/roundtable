@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Application models
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Anonymous alias system
+  aliasType     AliasType?
+  aliasYears    Int?       // How many years (e.g., "5 years PA resident")
+  aliasCustom   String?    // Additional context if needed
+
+  accounts Account[]
+  sessions Session[]
+  votes    Vote[]
+  comments Comment[]
+}
+
+enum AliasType {
+  PA_RESIDENT        // X years PA resident
+  COLLEGE_STUDENT    // X years college student in PA
+  POLI_SCI_WORKER    // X years political science worker
+  GOVT_WORKER        // X years government worker
+  JOURNALIST         // X years journalist
+  EDUCATOR           // X years educator
+  HEALTHCARE         // X years healthcare worker
+  OTHER              // Other background
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime @default(now())
+
+  // Core content - all kept short
+  title        String  // Article title
+  whoShouldCare String  // Brief: "PA voters", "Pittsburgh residents", etc.
+  summary      String  // 2-3 sentence summary
+  impact       String  // Brief impact statement
+
+  // Metadata
+  sourceUrl    String?  // Original source link
+  sourceName   String?  // e.g., "Philadelphia Inquirer"
+  category     String?  // e.g., "Education", "Healthcare", "Elections"
+  region       String?  // e.g., "Philadelphia", "Pittsburgh", "Statewide"
+
+  // Status
+  isActive     Boolean @default(true)
+
+  votes    Vote[]
+  comments Comment[]
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteType  VoteType
+
+  userId    String
+  articleId String
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId]) // One vote per user per article
+}
+
+enum VoteType {
+  APPROVE
+  DISAPPROVE
+  NEUTRAL
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  content   String
+
+  userId    String
+  articleId String
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, createdAt])
+}

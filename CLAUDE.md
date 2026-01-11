@@ -1,69 +1,195 @@
-# CLAUDE.md - AI Assistant Guidelines for Roundtable
+# CLAUDE.md - AI Assistant Guidelines for Roundtable PA
 
-This document provides guidance for AI assistants (like Claude) working on the Roundtable civic project.
+This document provides guidance for AI assistants working on the Roundtable PA civic engagement platform.
 
 ## Project Overview
 
-**Roundtable** is a civic project aimed at facilitating community engagement and democratic participation. The project is in early-stage development.
+**Roundtable PA** is an anonymous, nonbiased real-time political social media platform focused on Pennsylvania. Users engage with summarized news through voting and commenting, identified only by experience-based aliases.
 
-### Project Status
+### Core Concepts
 
-- **Stage**: Initial Development
-- **Repository**: Fresh initialization
-- **Primary Branch**: `main` (or as specified in git configuration)
+- **Anonymity**: Users are identified by aliases like "5 yr PA resident", not names
+- **Vote-first engagement**: Must vote before commenting on articles
+- **Summarized content**: Articles have title, who should care, summary, impact
+- **Nonpartisan design**: UI uses neutral colors, avoids party associations
 
-## Repository Structure
+## Tech Stack
+
+- **Next.js 14** with App Router
+- **TypeScript** for type safety
+- **Tailwind CSS** for styling
+- **Prisma** with SQLite for database
+- **NextAuth.js** for magic link authentication
+- **Zod** for validation
+
+## Project Structure
 
 ```
 roundtable/
-├── README.md          # Project description
-├── CLAUDE.md          # This file - AI assistant guidelines
-└── (future directories will be documented as added)
+├── prisma/
+│   ├── schema.prisma        # Database models
+│   └── seed.ts              # Sample PA articles
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── articles/    # Article CRUD, voting, comments
+│   │   │   ├── auth/        # NextAuth handler
+│   │   │   └── profile/     # User alias management
+│   │   ├── auth/            # Sign in/verify pages
+│   │   ├── profile/         # Profile setup page
+│   │   ├── layout.tsx       # Root layout with providers
+│   │   ├── page.tsx         # Main feed
+│   │   ├── globals.css      # Tailwind + custom styles
+│   │   └── providers.tsx    # SessionProvider wrapper
+│   ├── components/
+│   │   ├── Header.tsx       # Navigation with auth state
+│   │   ├── ArticleCard.tsx  # Article display with voting
+│   │   ├── VoteButtons.tsx  # Approve/Neutral/Disapprove
+│   │   └── CommentSection.tsx # Vote-gated comments
+│   ├── lib/
+│   │   ├── auth.ts          # NextAuth configuration
+│   │   └── db.ts            # Prisma client singleton
+│   └── types/
+│       └── index.ts         # Type definitions + helpers
 ```
 
-### Planned Structure (to be updated as project evolves)
+## Key Commands
 
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run lint         # Run ESLint
+npm run db:generate  # Generate Prisma client
+npm run db:push      # Push schema to database
+npm run db:seed      # Seed sample articles
+npm run db:studio    # Open Prisma Studio
 ```
-roundtable/
-├── src/               # Source code
-│   ├── components/    # UI components (if frontend)
-│   ├── services/      # Business logic / services
-│   ├── utils/         # Utility functions
-│   └── types/         # Type definitions
-├── tests/             # Test files
-├── docs/              # Documentation
-├── scripts/           # Build and utility scripts
-└── config/            # Configuration files
+
+## Database Schema
+
+### Models
+
+- **User**: Auth + alias (aliasType, aliasYears)
+- **Article**: Summarized news (title, whoShouldCare, summary, impact)
+- **Vote**: APPROVE/DISAPPROVE/NEUTRAL per user per article
+- **Comment**: Text content, linked to user vote
+
+### Key Constraints
+
+- One vote per user per article (`@@unique([userId, articleId])`)
+- Comments require prior vote (enforced in API)
+- Alias shown instead of user identity
+
+## UI/UX Patterns
+
+### Color Palette
+
+- `civic-*`: Neutral slate colors for UI
+- `approve`: Muted green (#059669)
+- `disapprove`: Muted red (#dc2626)
+- `neutral`: Gray (#6b7280)
+
+### Component Classes
+
+```css
+.btn-primary    /* Dark civic button */
+.btn-secondary  /* Light civic button */
+.card           /* White rounded container */
+.input          /* Form input styling */
+.vote-btn-*     /* Vote button variants */
+```
+
+### Article Card Layout
+
+1. Category tag + Region + Time
+2. Title (prominent)
+3. "Who should care" line
+4. Summary paragraph
+5. Impact box (highlighted)
+6. Source attribution
+7. Vote buttons
+8. Expandable comments
+
+## API Routes
+
+### GET /api/articles
+Returns articles with vote stats and user's vote/comment status
+
+### POST /api/articles/[id]/vote
+Body: `{ voteType: "APPROVE" | "DISAPPROVE" | "NEUTRAL" }`
+Requires auth, one vote per article
+
+### GET /api/articles/[id]/comments
+Returns comments with user aliases and vote badges
+
+### POST /api/articles/[id]/comments
+Body: `{ content: string }`
+Requires auth + prior vote on article
+
+### PATCH /api/profile
+Body: `{ aliasType: AliasType, aliasYears?: number }`
+Updates user's anonymous alias
+
+## Alias Types
+
+```typescript
+enum AliasType {
+  PA_RESIDENT       // "X yr PA resident"
+  COLLEGE_STUDENT   // "X yr college student"
+  POLI_SCI_WORKER   // "X yr poli sci worker"
+  GOVT_WORKER       // "X yr govt worker"
+  JOURNALIST        // "X yr journalist"
+  EDUCATOR          // "X yr educator"
+  HEALTHCARE        // "X yr healthcare worker"
+  OTHER             // "community member"
+}
 ```
 
 ## Development Guidelines
 
-### Getting Started
+### Adding New Features
 
-Since this is an early-stage project, initial setup steps will be documented here as the technology stack is established.
+1. Update Prisma schema if needed (`prisma/schema.prisma`)
+2. Run `npm run db:generate` and `npm run db:push`
+3. Add types to `src/types/index.ts`
+4. Create API routes in `src/app/api/`
+5. Build components in `src/components/`
+6. Use existing Tailwind classes and patterns
 
-### Code Style Conventions
+### Security Considerations
 
-Follow these conventions as the codebase grows:
+- All API routes check session authentication
+- Vote-before-comment enforced server-side
+- User emails never exposed in responses
+- Input validated with Zod schemas
+- Aliases are experience-based, not identifying
+
+### Civic Design Principles
+
+1. **Accessibility**: Ensure features work for all users
+2. **Neutrality**: Avoid colors/language suggesting political bias
+3. **Privacy**: Only show aliases, never emails/names
+4. **Transparency**: Show vote distributions after voting
+5. **Engagement**: Low barrier to participate (magic links)
+
+## Code Style Conventions
 
 1. **Naming Conventions**
-   - Use descriptive, meaningful names
    - Variables and functions: `camelCase`
-   - Classes and components: `PascalCase`
+   - Components and classes: `PascalCase`
    - Constants: `SCREAMING_SNAKE_CASE`
-   - Files: Match the export name (e.g., `UserProfile.tsx` for `UserProfile` component)
+   - Files: Match the export name (e.g., `ArticleCard.tsx`)
 
 2. **Code Organization**
    - Keep files focused and single-purpose
    - Prefer composition over inheritance
    - Extract reusable logic into utility functions
 
-3. **Comments and Documentation**
+3. **Comments**
    - Write self-documenting code where possible
    - Add comments for complex business logic
-   - Document public APIs and interfaces
 
-### Git Workflow
+## Git Workflow
 
 1. **Branch Naming**
    - Feature branches: `feature/<description>`
@@ -73,102 +199,15 @@ Follow these conventions as the codebase grows:
 2. **Commit Messages**
    - Use present tense: "Add feature" not "Added feature"
    - Be concise but descriptive
-   - Reference issues when applicable: "Fix login bug (#123)"
 
-3. **Pull Requests**
-   - Include clear description of changes
-   - Reference related issues
-   - Ensure tests pass before requesting review
+## Future Considerations
 
-## AI Assistant Best Practices
-
-When working on this project, AI assistants should:
-
-### Before Making Changes
-
-1. **Understand Context**: Read relevant files before suggesting modifications
-2. **Check Existing Patterns**: Look for established patterns in the codebase
-3. **Verify Requirements**: Ensure understanding of what's being requested
-
-### While Making Changes
-
-1. **Keep Changes Focused**: Make only the changes requested
-2. **Avoid Over-Engineering**: Simple solutions are preferred
-3. **Follow Existing Conventions**: Match the style of surrounding code
-4. **Security First**: Never introduce vulnerabilities (XSS, SQL injection, etc.)
-5. **Test Considerations**: Consider how changes can be tested
-
-### After Making Changes
-
-1. **Verify Changes Work**: Run tests and builds when available
-2. **Commit Appropriately**: Use clear, descriptive commit messages
-3. **Document Significant Changes**: Update documentation as needed
-
-## Testing
-
-Testing framework and conventions will be documented here once established.
-
-### Expected Testing Practices
-
-- Write unit tests for utility functions
-- Write integration tests for services
-- Write end-to-end tests for critical user flows
-- Maintain reasonable test coverage
-
-## Building and Running
-
-Build commands and development server instructions will be documented here once the technology stack is established.
-
-### Common Commands (placeholder)
-
-```bash
-# Install dependencies
-# npm install (or yarn/pnpm)
-
-# Run development server
-# npm run dev
-
-# Run tests
-# npm test
-
-# Build for production
-# npm run build
-```
-
-## Environment Configuration
-
-Environment variables and configuration will be documented here as the project develops.
-
-### Expected Environment Files
-
-- `.env.local` - Local development overrides (not committed)
-- `.env.example` - Template for environment variables (committed)
-
-## Civic Project Considerations
-
-As a civic project, special attention should be paid to:
-
-1. **Accessibility**: Ensure features are accessible to all users
-2. **Inclusivity**: Design for diverse communities
-3. **Privacy**: Handle user data responsibly
-4. **Transparency**: Keep processes open and understandable
-5. **Security**: Protect user information and system integrity
-
-## Troubleshooting
-
-Common issues and solutions will be documented here as they are discovered.
-
-## Contributing
-
-Contribution guidelines will be established as the project matures.
-
-### Current Contribution Process
-
-1. Create a feature branch from main
-2. Make your changes following the guidelines above
-3. Test your changes
-4. Submit a pull request with a clear description
+- Real-time updates with SSE or WebSockets
+- Admin panel for article management
+- Content moderation system
+- Expanded regions beyond PA
+- Mobile app version
 
 ---
 
-*This document should be updated as the project evolves. When new patterns, technologies, or conventions are established, add them here to help future contributors and AI assistants work effectively on this codebase.*
+*Update this document as the project evolves.*

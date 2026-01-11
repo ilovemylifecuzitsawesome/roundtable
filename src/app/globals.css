@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-civic-800 text-white hover:bg-civic-700 focus:ring-civic-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-civic-100 text-civic-700 hover:bg-civic-200 focus:ring-civic-400;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-civic-100 focus:ring-civic-400;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-civic-200;
+  }
+
+  .input {
+    @apply w-full px-4 py-2 rounded-lg border border-civic-300 focus:border-civic-500 focus:ring-2 focus:ring-civic-200 focus:outline-none transition-colors;
+  }
+
+  .vote-btn {
+    @apply flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-all;
+  }
+
+  .vote-btn-approve {
+    @apply vote-btn border-approve/30 hover:border-approve hover:bg-approve/10;
+  }
+
+  .vote-btn-approve.selected {
+    @apply border-approve bg-approve/20 text-approve;
+  }
+
+  .vote-btn-disapprove {
+    @apply vote-btn border-disapprove/30 hover:border-disapprove hover:bg-disapprove/10;
+  }
+
+  .vote-btn-disapprove.selected {
+    @apply border-disapprove bg-disapprove/20 text-disapprove;
+  }
+
+  .vote-btn-neutral {
+    @apply vote-btn border-neutral/30 hover:border-neutral hover:bg-neutral/10;
+  }
+
+  .vote-btn-neutral.selected {
+    @apply border-neutral bg-neutral/20 text-neutral;
+  }
+}
