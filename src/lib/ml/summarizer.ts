@@ -1,8 +1,12 @@
-import { pipeline, Pipeline } from "@xenova/transformers";
+import { pipeline } from "@xenova/transformers";
+
+// Use generic type for pipeline instances (transformers.js types can vary)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PipelineInstance = any;
 
 // Singleton pattern for model loading
-let summarizer: Pipeline | null = null;
-let classifier: Pipeline | null = null;
+let summarizer: PipelineInstance = null;
+let classifier: PipelineInstance = null;
 
 // PA-related keywords for relevance scoring
 const PA_KEYWORDS = [
@@ -63,7 +67,7 @@ const POLITICAL_KEYWORDS = [
   "economy",
 ];
 
-export async function getSummarizer(): Promise<Pipeline> {
+export async function getSummarizer(): Promise<PipelineInstance> {
   if (!summarizer) {
     console.log("Loading summarization model...");
     summarizer = await pipeline(
@@ -76,7 +80,7 @@ export async function getSummarizer(): Promise<Pipeline> {
   return summarizer;
 }
 
-export async function getClassifier(): Promise<Pipeline> {
+export async function getClassifier(): Promise<PipelineInstance> {
   if (!classifier) {
     console.log("Loading classification model...");
     classifier = await pipeline(
