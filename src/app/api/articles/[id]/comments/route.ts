@@ -8,12 +8,14 @@ const commentSchema = z.object({
   content: z.string().min(1).max(500),
 });
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(req: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const comments = await db.comment.findMany({
       where: { articleId: id },
       orderBy: { createdAt: "desc" },
@@ -60,12 +62,9 @@ export async function GET(
   }
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+export async function POST(req: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
