@@ -3,44 +3,37 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // User profile (linked to Supabase Auth)
 model User {
-  id        String   @id // Supabase auth user ID
+  id        String   @id
   email     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Anonymous alias system (stored as string for SQLite)
-  aliasType  String?  // PA_RESIDENT, COLLEGE_STUDENT, etc.
+  aliasType  String?
   aliasYears Int?
-
   votes    Vote[]
   comments Comment[]
+  follows  UserFollow[]
 }
 
 // Raw articles from RSS feeds (before processing)
 model RawArticle {
   id          String   @id @default(cuid())
   createdAt   DateTime @default(now())
-
-  // Source info
-  sourceUrl   String   @unique // Dedupe by URL
+  sourceUrl   String   @unique
   sourceName  String
   sourceTitle String
-  sourceContent String? // Full text if available
+  sourceContent String?
   publishedAt DateTime?
-
-  // Processing status (stored as string for SQLite)
-  status      String   @default("PENDING") // PENDING, PROCESSING, APPROVED, REJECTED, SUMMARIZED, ERROR
+  status      String   @default("PENDING")
   relevanceScore Float?
   processedAt DateTime?
   errorMessage String?
-
-  // Link to processed article if approved
   articleId   String?  @unique
   article     Article? @relation(fields: [articleId], references: [id])
 }
@@ -51,41 +44,35 @@ model Article {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   publishedAt DateTime @default(now())
-
-  // AI-generated content
   title         String
   whoShouldCare String
   summary       String
   impact        String
-
-  // Source metadata
   sourceUrl  String?
   sourceName String?
   category   String?
   region     String?
-
-  // Status
   isActive Boolean @default(true)
 
-  // Relations
+  // Completion loop fields
+  policyStatus String?
+  policyStatusUpdatedAt DateTime?
+
   rawArticle RawArticle?
   votes      Vote[]
   comments   Comment[]
+  follows    UserFollow[]
 }
 
 model Vote {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  voteType String // APPROVE, DISAPPROVE, NEUTRAL
-
+  voteType  String
   userId    String
   articleId String
-
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
   @@unique([userId, articleId])
 }
 
@@ -93,26 +80,33 @@ model Comment {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  content String
-
+  content   String
   userId    String
   articleId String
-
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 }
 
-// RSS feed sources
 model FeedSource {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   name      String
   url       String   @unique
   region    String?
   category  String?
   isActive  Boolean  @default(true)
   lastFetchedAt DateTime?
+}
+
+// For completion loop - users following articles
+model UserFollow {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  articleId String
+  notifiedAt DateTime?
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  @@unique([userId, articleId])
 }
