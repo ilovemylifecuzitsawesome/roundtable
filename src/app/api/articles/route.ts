@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { ArticleWithStats } from "@/types";
+import { ArticleWithStats, VoteType } from "@/types";
 
 export async function GET(req: NextRequest) {
   try {
@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
           neutralCount: counts.neutral,
           commentCount: article.comments.length,
         },
-        userVote: (userVotes[article.id] as any) || null,
+        userVote: (userVotes[article.id] as VoteType) || null,
         hasCommented: userComments.has(article.id),
       };
     });
