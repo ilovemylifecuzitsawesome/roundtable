@@ -27,7 +27,7 @@ export async function GET(
     });
 
     // Get user votes for these comments
-    const userIds = [...new Set(comments.map((c) => c.userId))];
+    const userIds = Array.from(new Set(comments.map((c) => c.userId)));
     const votes = await db.vote.findMany({
       where: {
         articleId: params.id,

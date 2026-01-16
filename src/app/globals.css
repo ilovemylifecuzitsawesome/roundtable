@@ -1,64 +1,99 @@
+/* stylelint-disable at-rule-no-unknown */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* stylelint-enable at-rule-no-unknown */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  body {
+    @apply bg-surface-secondary text-gray-900;
+  }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-button hover:shadow-md active:scale-[0.98];
   }
 
   .btn-primary {
-    @apply btn bg-civic-800 text-white hover:bg-civic-700 focus:ring-civic-500;
+    @apply btn bg-gradient-to-r from-civic-600 to-civic-700 text-white hover:from-civic-700 hover:to-civic-800 focus:ring-civic-500;
   }
 
   .btn-secondary {
-    @apply btn bg-civic-100 text-civic-700 hover:bg-civic-200 focus:ring-civic-400;
+    @apply btn bg-white text-civic-700 border border-civic-200 hover:bg-civic-50 hover:border-civic-300 focus:ring-civic-400;
   }
 
   .btn-ghost {
-    @apply btn bg-transparent hover:bg-civic-100 focus:ring-civic-400;
+    @apply btn bg-transparent shadow-none hover:bg-civic-100 focus:ring-civic-400;
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-civic-200;
+    @apply bg-white rounded-2xl shadow-card border border-gray-100 transition-shadow duration-200 hover:shadow-card-hover;
   }
 
   .input {
-    @apply w-full px-4 py-2 rounded-lg border border-civic-300 focus:border-civic-500 focus:ring-2 focus:ring-civic-200 focus:outline-none transition-colors;
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-civic-500 focus:ring-4 focus:ring-civic-100 focus:outline-none transition-all duration-200 text-gray-900 placeholder:text-gray-400;
   }
 
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold;
+  }
+
+  .badge-category {
+    @apply badge bg-civic-100 text-civic-700;
+  }
+
+  .badge-region {
+    @apply badge bg-amber-100 text-amber-700;
+  }
+
+  /* Vote buttons */
   .vote-btn {
-    @apply flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-all;
+    @apply flex-1 py-3.5 px-4 rounded-xl border-2 font-semibold text-sm transition-all duration-200 flex flex-col items-center gap-1;
   }
 
   .vote-btn-approve {
-    @apply vote-btn border-approve/30 hover:border-approve hover:bg-approve/10;
+    @apply vote-btn border-gray-200 text-gray-600 hover:border-approve hover:bg-approve-light hover:text-approve-dark;
   }
 
   .vote-btn-approve.selected {
-    @apply border-approve bg-approve/20 text-approve;
+    @apply border-approve bg-approve-light text-approve-dark;
   }
 
   .vote-btn-disapprove {
-    @apply vote-btn border-disapprove/30 hover:border-disapprove hover:bg-disapprove/10;
+    @apply vote-btn border-gray-200 text-gray-600 hover:border-disapprove hover:bg-disapprove-light hover:text-disapprove-dark;
   }
 
   .vote-btn-disapprove.selected {
-    @apply border-disapprove bg-disapprove/20 text-disapprove;
+    @apply border-disapprove bg-disapprove-light text-disapprove-dark;
   }
 
   .vote-btn-neutral {
-    @apply vote-btn border-neutral/30 hover:border-neutral hover:bg-neutral/10;
+    @apply vote-btn border-gray-200 text-gray-600 hover:border-neutral hover:bg-neutral-light hover:text-neutral-dark;
   }
 
   .vote-btn-neutral.selected {
-    @apply border-neutral bg-neutral/20 text-neutral;
+    @apply border-neutral bg-neutral-light text-neutral-dark;
   }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full hover:bg-gray-400;
 }
