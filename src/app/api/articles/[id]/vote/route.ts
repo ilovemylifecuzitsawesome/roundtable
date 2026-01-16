@@ -9,8 +9,9 @@ const voteSchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -24,7 +25,7 @@ export async function POST(
 
     // Check if article exists
     const article = await db.article.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!article) {
@@ -36,7 +37,7 @@ export async function POST(
       where: {
         userId_articleId: {
           userId: user.id,
-          articleId: params.id,
+          articleId: id,
         },
       },
     });
@@ -53,7 +54,7 @@ export async function POST(
       data: {
         voteType,
         userId: user.id,
-        articleId: params.id,
+        articleId: id,
       },
     });
 

@@ -10,11 +10,12 @@ const commentSchema = z.object({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const comments = await db.comment.findMany({
-      where: { articleId: params.id },
+      where: { articleId: id },
       orderBy: { createdAt: "desc" },
       include: {
         user: {
@@ -30,7 +31,7 @@ export async function GET(
     const userIds = Array.from(new Set(comments.map((c) => c.userId)));
     const votes = await db.vote.findMany({
       where: {
-        articleId: params.id,
+        articleId: id,
         userId: { in: userIds },
       },
       select: {
@@ -61,8 +62,9 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -76,7 +78,7 @@ export async function POST(
       where: {
         userId_articleId: {
           userId: user.id,
-          articleId: params.id,
+          articleId: id,
         },
       },
     });
@@ -95,7 +97,7 @@ export async function POST(
       data: {
         content,
         userId: user.id,
-        articleId: params.id,
+        articleId: id,
       },
     });
 
