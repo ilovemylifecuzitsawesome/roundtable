@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -11,6 +11,9 @@ type RouteContext = {
 export async function GET(req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+
+    // Lazy import
+    const { db } = await import("@/lib/db");
 
     const user = await db.user.findUnique({
       where: { id },

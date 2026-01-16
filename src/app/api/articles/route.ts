@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { db } from "@/lib/db";
-import { ArticleWithStats, VoteType } from "@/types";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   try {
+    // Lazy imports to avoid build-time issues
+    const { createClient } = await import("@/lib/supabase/server");
+    const { db } = await import("@/lib/db");
+
+    type VoteType = "APPROVE" | "DISAPPROVE" | "NEUTRAL";
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id;
@@ -65,7 +69,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const articlesWithStats: ArticleWithStats[] = articles.map((article) => {
+    const articlesWithStats = articles.map((article) => {
       const counts = voteCountMap[article.id] || {
         approve: 0,
         disapprove: 0,
