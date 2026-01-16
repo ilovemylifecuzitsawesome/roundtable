@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { db } from "@/lib/db";
-import { z } from "zod";
-import { formatAlias, CommentWithAlias, VoteType } from "@/types";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
-
-const commentSchema = z.object({
-  content: z.string().min(1).max(500),
-});
+export const runtime = "nodejs";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -18,6 +11,12 @@ type RouteContext = {
 export async function GET(req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+
+    // Lazy import to avoid build-time issues
+    const { db } = await import("@/lib/db");
+    const { formatAlias } = await import("@/types");
+
+    type VoteType = "APPROVE" | "DISAPPROVE" | "NEUTRAL";
 
     const comments = await db.comment.findMany({
       where: { articleId: id },
@@ -32,7 +31,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
       },
     });
 
-    // Get user votes for these comments
     const userIds = Array.from(new Set(comments.map((c) => c.userId)));
     const votes = await db.vote.findMany({
       where: {
@@ -47,7 +45,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     const voteMap = Object.fromEntries(votes.map((v) => [v.userId, v.voteType]));
 
-    const commentsWithAlias: CommentWithAlias[] = comments.map((comment) => ({
+    const commentsWithAlias = comments.map((comment) => ({
       id: comment.id,
       content: comment.content,
       createdAt: comment.createdAt,
@@ -68,6 +66,16 @@ export async function GET(req: NextRequest, context: RouteContext) {
 export async function POST(req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+
+    // Lazy imports
+    const { createClient } = await import("@/lib/supabase/server");
+    const { db } = await import("@/lib/db");
+    const { z } = await import("zod");
+
+    const commentSchema = z.object({
+      content: z.string().min(1).max(500),
+    });
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -75,7 +83,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user has voted first
     const vote = await db.vote.findUnique({
       where: {
         userId_articleId: {
@@ -105,12 +112,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ comment });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Invalid comment content" },
-        { status: 400 }
-      );
-    }
     console.error("Failed to create comment:", error);
     return NextResponse.json(
       { error: "Failed to create comment" },
