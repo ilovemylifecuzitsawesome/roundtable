@@ -1,6 +1,6 @@
 "use client";
 
-import { VoteType } from "@prisma/client";
+import { VoteType } from "@/types";
 import clsx from "clsx";
 
 interface VoteButtonsProps {

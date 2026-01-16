@@ -3,8 +3,7 @@
 import { useAuth } from "@/app/providers";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AliasType } from "@prisma/client";
-import { ALIAS_LABELS } from "@/types";
+import { ALIAS_LABELS, AliasType } from "@/types";
 
 const ALIAS_OPTIONS: { value: AliasType; label: string; description: string }[] = [
   {

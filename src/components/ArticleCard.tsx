@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { VoteType } from "@prisma/client";
-import { ArticleWithStats } from "@/types";
+import { ArticleWithStats, VoteType } from "@/types";
 import { VoteButtons } from "./VoteButtons";
 import { CommentSection } from "./CommentSection";
 import { formatDistanceToNow } from "date-fns";

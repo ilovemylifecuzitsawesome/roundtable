@@ -9,7 +9,7 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { AliasType } from "@prisma/client";
+import { AliasType } from "@/types";
 
 interface UserProfile {
   id: string;
