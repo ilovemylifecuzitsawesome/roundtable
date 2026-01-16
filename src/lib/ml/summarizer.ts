@@ -1,12 +1,11 @@
-import { pipeline } from "@xenova/transformers";
+// NOTE: @xenova/transformers is NOT imported at top level to avoid webpack bundling native bindings
+// It's dynamically imported only when ML features are actually used
 
-// Use generic type for pipeline instances (transformers.js types can vary)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PipelineInstance = any;
 
 // Singleton pattern for model loading
 let summarizer: PipelineInstance = null;
-let classifier: PipelineInstance = null;
 
 // PA-related keywords for relevance scoring
 const PA_KEYWORDS = [
@@ -67,9 +66,12 @@ const POLITICAL_KEYWORDS = [
   "economy",
 ];
 
-export async function getSummarizer(): Promise<PipelineInstance> {
+// Dynamic import of transformers - only loaded when ML is actually used
+async function getSummarizer(): Promise<PipelineInstance> {
   if (!summarizer) {
     console.log("Loading summarization model...");
+    // Dynamic import to avoid webpack bundling native bindings
+    const { pipeline } = await import("@xenova/transformers");
     summarizer = await pipeline(
       "summarization",
       "Xenova/distilbart-cnn-6-6",
@@ -78,19 +80,6 @@ export async function getSummarizer(): Promise<PipelineInstance> {
     console.log("Summarization model loaded.");
   }
   return summarizer;
-}
-
-export async function getClassifier(): Promise<PipelineInstance> {
-  if (!classifier) {
-    console.log("Loading classification model...");
-    classifier = await pipeline(
-      "zero-shot-classification",
-      "Xenova/mobilebert-uncased-mnli",
-      { quantized: true }
-    );
-    console.log("Classification model loaded.");
-  }
-  return classifier;
 }
 
 export function calculateRelevanceScore(
@@ -194,7 +183,7 @@ export interface SummarizedArticle {
   impact: string;
 }
 
-// Simple extraction-based summarization (no ML, fast)
+// Simple extraction-based summarization (no ML, fast, serverless-friendly)
 export function summarizeArticleSimple(
   originalTitle: string,
   content: string,
@@ -225,7 +214,9 @@ export function summarizeArticleSimple(
 }
 
 // ML-based summarization (slower but better quality)
-export async function summarizeArticleML(
+// NOTE: This requires @xenova/transformers which has native bindings
+// Only use in environments that support it (not serverless)
+async function summarizeArticleML(
   originalTitle: string,
   content: string,
   region: string
@@ -242,6 +233,7 @@ export async function summarizeArticleML(
     do_sample: false,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const summary = (summaryResult as any)[0]?.summary_text || truncatedContent.slice(0, 200);
 
   // Generate a concise title if original is too long
@@ -264,7 +256,7 @@ export async function summarizeArticleML(
   };
 }
 
-// Main summarization function - tries ML first, falls back to simple
+// Main summarization function - uses simple by default for serverless compatibility
 export async function summarizeArticle(
   originalTitle: string,
   content: string,
