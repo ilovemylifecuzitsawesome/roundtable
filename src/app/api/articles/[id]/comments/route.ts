@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { formatAlias, CommentWithAlias, VoteType } from "@/types";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 const commentSchema = z.object({
   content: z.string().min(1).max(500),
 });

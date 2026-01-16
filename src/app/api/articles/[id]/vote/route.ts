@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { z } from "zod";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 const voteSchema = z.object({
   voteType: z.enum(["APPROVE", "DISAPPROVE", "NEUTRAL"]),
 });
