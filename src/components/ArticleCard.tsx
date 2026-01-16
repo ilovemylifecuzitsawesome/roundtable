@@ -36,76 +36,70 @@ export function ArticleCard({
     }
   };
 
-  const totalVotes =
-    article.stats.approveCount +
-    article.stats.disapproveCount +
-    article.stats.neutralCount;
-
   return (
-    <article className="card overflow-hidden">
-      {/* Header with category and region */}
-      <div className="px-6 pt-5 pb-3 flex items-center gap-2 text-sm">
-        {article.category && (
-          <span className="px-2 py-0.5 bg-civic-100 text-civic-600 rounded-full text-xs font-medium">
-            {article.category}
+    <article className="card overflow-hidden animate-fade-in">
+      {/* Header */}
+      <div className="px-6 pt-6 pb-4">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          {article.category && (
+            <span className="badge-category">
+              {article.category}
+            </span>
+          )}
+          {article.region && (
+            <span className="badge-region">
+              {article.region}
+            </span>
+          )}
+          <span className="text-xs text-gray-400 ml-auto">
+            {formatDistanceToNow(new Date(article.publishedAt), {
+              addSuffix: true,
+            })}
           </span>
-        )}
-        {article.region && (
-          <span className="text-civic-400">{article.region}</span>
-        )}
-        <span className="text-civic-300">·</span>
-        <span className="text-civic-400">
-          {formatDistanceToNow(new Date(article.publishedAt), {
-            addSuffix: true,
-          })}
-        </span>
-      </div>
+        </div>
 
-      {/* Title */}
-      <div className="px-6 pb-3">
-        <h2 className="text-xl font-semibold text-civic-900 leading-tight">
+        {/* Title */}
+        <h2 className="text-xl font-bold text-gray-900 leading-snug mb-4">
           {article.title}
         </h2>
-      </div>
 
-      {/* Who Should Care */}
-      <div className="px-6 pb-3">
-        <div className="flex items-start gap-2">
-          <span className="text-xs font-medium text-civic-500 uppercase tracking-wide shrink-0">
-            Who should care
-          </span>
-          <span className="text-sm text-civic-700">{article.whoShouldCare}</span>
+        {/* Who Should Care */}
+        <div className="flex items-start gap-3 mb-4">
+          <div className="shrink-0 w-1 h-full bg-civic-500 rounded-full self-stretch" />
+          <div>
+            <span className="text-[10px] font-bold text-civic-600 uppercase tracking-wider">
+              Who should care
+            </span>
+            <p className="text-sm text-gray-700 mt-0.5">{article.whoShouldCare}</p>
+          </div>
         </div>
-      </div>
 
-      {/* Summary */}
-      <div className="px-6 pb-3">
-        <p className="text-civic-700 leading-relaxed">{article.summary}</p>
-      </div>
+        {/* Summary */}
+        <p className="text-gray-600 leading-relaxed mb-4">{article.summary}</p>
 
-      {/* Impact */}
-      <div className="px-6 pb-4">
-        <div className="flex items-start gap-2 bg-civic-50 rounded-lg p-3">
-          <span className="text-xs font-medium text-civic-500 uppercase tracking-wide shrink-0">
+        {/* Impact */}
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-100">
+          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
             Impact
           </span>
-          <span className="text-sm text-civic-800 font-medium">
+          <p className="text-sm text-amber-900 font-medium mt-1">
             {article.impact}
-          </span>
+          </p>
         </div>
+
+        {/* Source */}
+        {article.sourceName && (
+          <p className="text-xs text-gray-400 mt-4">
+            Source: <span className="text-gray-500">{article.sourceName}</span>
+          </p>
+        )}
       </div>
 
-      {/* Source */}
-      {article.sourceName && (
-        <div className="px-6 pb-4">
-          <span className="text-xs text-civic-400">
-            Source: {article.sourceName}
-          </span>
-        </div>
-      )}
-
       {/* Voting Section */}
-      <div className="px-6 pb-4 border-t border-civic-100 pt-4">
+      <div className="px-6 pb-5 pt-2 border-t border-gray-100 bg-gray-50/50">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          What do you think?
+        </p>
         <VoteButtons
           currentVote={currentVote}
           onVote={handleVote}
@@ -117,17 +111,22 @@ export function ArticleCard({
       </div>
 
       {/* Comment Toggle */}
-      <div className="border-t border-civic-100">
+      <div className="border-t border-gray-100">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full px-6 py-3 flex items-center justify-between text-sm text-civic-600 hover:bg-civic-50 transition-colors"
+          className="w-full px-6 py-4 flex items-center justify-between text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
         >
-          <span>
-            {article.stats.commentCount}{" "}
-            {article.stats.commentCount === 1 ? "comment" : "comments"}
-          </span>
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span>
+              {article.stats.commentCount}{" "}
+              {article.stats.commentCount === 1 ? "comment" : "comments"}
+            </span>
+          </div>
           <svg
-            className={`w-4 h-4 transition-transform ${
+            className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
               isExpanded ? "rotate-180" : ""
             }`}
             fill="none"
