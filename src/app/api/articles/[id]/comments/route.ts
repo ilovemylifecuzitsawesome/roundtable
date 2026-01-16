@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { z } from "zod";
-import { formatAlias, CommentWithAlias } from "@/types";
+import { formatAlias, CommentWithAlias, VoteType } from "@/types";
 
 const commentSchema = z.object({
   content: z.string().min(1).max(500),
@@ -46,7 +46,7 @@ export async function GET(
       content: comment.content,
       createdAt: comment.createdAt,
       userAlias: formatAlias(comment.user.aliasType, comment.user.aliasYears),
-      userVote: voteMap[comment.userId] || "NEUTRAL",
+      userVote: (voteMap[comment.userId] || "NEUTRAL") as VoteType,
     }));
 
     return NextResponse.json({ comments: commentsWithAlias });
