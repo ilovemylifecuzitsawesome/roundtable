@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { db } from "@/lib/db";
-import { z } from "zod";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
-
-const voteSchema = z.object({
-  voteType: z.enum(["APPROVE", "DISAPPROVE", "NEUTRAL"]),
-});
+export const runtime = "nodejs";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -17,6 +11,16 @@ type RouteContext = {
 export async function POST(req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+
+    // Lazy imports
+    const { createClient } = await import("@/lib/supabase/server");
+    const { db } = await import("@/lib/db");
+    const { z } = await import("zod");
+
+    const voteSchema = z.object({
+      voteType: z.enum(["APPROVE", "DISAPPROVE", "NEUTRAL"]),
+    });
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -64,9 +68,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ vote });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "Invalid vote type" }, { status: 400 });
-    }
     console.error("Failed to create vote:", error);
     return NextResponse.json(
       { error: "Failed to create vote" },

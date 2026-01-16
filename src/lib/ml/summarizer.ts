@@ -194,7 +194,38 @@ export interface SummarizedArticle {
   impact: string;
 }
 
-export async function summarizeArticle(
+// Simple extraction-based summarization (no ML, fast)
+export function summarizeArticleSimple(
+  originalTitle: string,
+  content: string,
+  region: string
+): SummarizedArticle {
+  // Extract first 2-3 meaningful sentences as summary
+  const sentences = content
+    .split(/[.!?]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 30 && s.length < 300);
+
+  const summary = sentences.slice(0, 2).join(". ") + ".";
+
+  const title = originalTitle.length > 80
+    ? originalTitle.slice(0, 77) + "..."
+    : originalTitle;
+
+  const category = detectCategory(originalTitle, content);
+  const whoShouldCare = generateWhoShouldCare(region, category, content);
+  const impact = generateImpact(category, content);
+
+  return {
+    title,
+    whoShouldCare,
+    summary: summary || content.slice(0, 200) + "...",
+    impact,
+  };
+}
+
+// ML-based summarization (slower but better quality)
+export async function summarizeArticleML(
   originalTitle: string,
   content: string,
   region: string
@@ -231,6 +262,34 @@ export async function summarizeArticle(
     summary,
     impact,
   };
+}
+
+// Main summarization function - tries ML first, falls back to simple
+export async function summarizeArticle(
+  originalTitle: string,
+  content: string,
+  region: string,
+  useML: boolean = false // Default to simple for serverless compatibility
+): Promise<SummarizedArticle> {
+  if (!useML) {
+    // Use simple extraction (fast, serverless-friendly)
+    return summarizeArticleSimple(originalTitle, content, region);
+  }
+
+  try {
+    // Try ML with a timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("ML timeout")), 30000);
+    });
+
+    return await Promise.race([
+      summarizeArticleML(originalTitle, content, region),
+      timeoutPromise,
+    ]);
+  } catch (error) {
+    console.warn("ML summarization failed, falling back to simple:", error);
+    return summarizeArticleSimple(originalTitle, content, region);
+  }
 }
 
 function generateWhoShouldCare(
