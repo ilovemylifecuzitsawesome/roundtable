@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { z } from "zod";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 const profileSchema = z.object({
   aliasType: z.enum([
     "PA_RESIDENT",
@@ -19,7 +22,7 @@ const profileSchema = z.object({
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
