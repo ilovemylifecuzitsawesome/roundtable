@@ -17,7 +17,7 @@ type RouteContext = {
 export async function POST(req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
