@@ -7,12 +7,13 @@ const voteSchema = z.object({
   voteType: z.enum(["APPROVE", "DISAPPROVE", "NEUTRAL"]),
 });
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function POST(req: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 

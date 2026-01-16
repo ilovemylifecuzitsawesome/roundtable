@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(req: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const user = await db.user.findUnique({
       where: { id },
       select: {
