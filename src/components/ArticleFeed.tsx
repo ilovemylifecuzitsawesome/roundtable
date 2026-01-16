@@ -1,7 +1,6 @@
 "use client";
 
-import { ArticleWithStats } from "@/types";
-import { VoteType } from "@prisma/client";
+import { ArticleWithStats, VoteType } from "@/types";
 import { ArticleCard } from "./ArticleCard";
 
 interface ArticleFeedProps {

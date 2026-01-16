@@ -1,16 +1,15 @@
-import { AliasType, VoteType } from "@prisma/client";
+// Define types locally (not from Prisma since we use strings, not enums)
+export type AliasType =
+  | "PA_RESIDENT"
+  | "COLLEGE_STUDENT"
+  | "POLI_SCI_WORKER"
+  | "GOVT_WORKER"
+  | "JOURNALIST"
+  | "EDUCATOR"
+  | "HEALTHCARE"
+  | "OTHER";
 
-// Extend NextAuth types
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string;
-      email?: string | null;
-      aliasType?: AliasType | null;
-      aliasYears?: number | null;
-    };
-  }
-}
+export type VoteType = "APPROVE" | "DISAPPROVE" | "NEUTRAL";
 
 // API response types
 export interface ArticleWithStats {
@@ -38,7 +37,7 @@ export interface CommentWithAlias {
   id: string;
   content: string;
   createdAt: Date;
-  userAlias: string; // Formatted alias like "5 yr PA resident"
+  userAlias: string;
   userVote: VoteType;
 }
 
@@ -55,11 +54,11 @@ export const ALIAS_LABELS: Record<AliasType, string> = {
 };
 
 export function formatAlias(
-  type: AliasType | null | undefined,
+  type: AliasType | string | null | undefined,
   years: number | null | undefined
 ): string {
   if (!type) return "Anonymous";
-  const label = ALIAS_LABELS[type] || "community member";
+  const label = ALIAS_LABELS[type as AliasType] || "community member";
   if (years && years > 0) {
     return `${years} yr ${label}`;
   }

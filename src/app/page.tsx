@@ -2,8 +2,7 @@
 
 import { useAuth } from "@/app/providers";
 import { useState, useEffect, useCallback } from "react";
-import { ArticleWithStats } from "@/types";
-import { VoteType } from "@prisma/client";
+import { ArticleWithStats, VoteType } from "@/types";
 import { ArticleCard } from "@/components/ArticleCard";
 import { createClient } from "@/lib/supabase/client";
 

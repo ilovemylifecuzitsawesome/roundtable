@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CommentWithAlias, VOTE_LABELS } from "@/types";
-import { VoteType } from "@prisma/client";
+import { CommentWithAlias, VOTE_LABELS, VoteType } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import clsx from "clsx";
 
