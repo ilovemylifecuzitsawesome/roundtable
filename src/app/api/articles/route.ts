@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { ArticleWithStats, VoteType } from "@/types";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const supabase = createClient();
