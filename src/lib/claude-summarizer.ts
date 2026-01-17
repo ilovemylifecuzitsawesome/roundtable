@@ -1,8 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Groq from "groq-sdk";
 
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+// Initialize Groq client
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 export interface PolicySummary {
@@ -35,10 +35,8 @@ export interface PolicySummary {
 }
 
 /**
- * Summarize a news article using Claude API
+ * Summarize a news article using Groq API (Llama)
  * Returns null if article is not PA policy-relevant
- *
- * Cost: ~$0.001 per article (using Haiku)
  */
 export async function summarizeWithClaude(
   articleTitle: string,
@@ -86,17 +84,28 @@ Guidelines:
 Respond ONLY with valid JSON, no other text.`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307", // Fast and cheap (~$0.001/article)
-      max_tokens: 800,
+    const response = await groq.chat.completions.create({
+      model: "llama-3.1-8b-instant", // Fast and free tier friendly
       messages: [{ role: "user", content: prompt }],
+      max_tokens: 800,
+      temperature: 0.1, // Low temperature for consistent output
     });
 
-    const text =
-      response.content[0].type === "text" ? response.content[0].text : "";
+    const text = response.choices[0]?.message?.content || "";
 
-    // Parse JSON response
-    const parsed = JSON.parse(text) as PolicySummary;
+    // Parse JSON response - handle potential markdown code blocks
+    let jsonText = text.trim();
+    if (jsonText.startsWith("```json")) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith("```")) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith("```")) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    const parsed = JSON.parse(jsonText) as PolicySummary;
 
     if (!parsed.isPolicyRelevant) {
       console.log(`⏭️  Skipping non-policy article: ${articleTitle}`);
@@ -106,14 +115,14 @@ Respond ONLY with valid JSON, no other text.`;
     console.log(`✅ Summarized: ${parsed.shortTitle} (${parsed.status})`);
     return parsed;
   } catch (error) {
-    console.error("❌ Claude summarization failed:", error);
+    console.error("❌ Groq summarization failed:", error);
     return null;
   }
 }
 
 /**
- * Check if we have a valid Anthropic API key
+ * Check if we have a valid Groq API key
  */
 export function hasAnthropicKey(): boolean {
-  return !!process.env.ANTHROPIC_API_KEY;
+  return !!process.env.GROQ_API_KEY;
 }

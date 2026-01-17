@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     // Check for API key
     if (!hasAnthropicKey()) {
       return NextResponse.json(
-        { error: "ANTHROPIC_API_KEY not configured" },
+        { error: "GROQ_API_KEY not configured" },
         { status: 500 }
       );
     }
