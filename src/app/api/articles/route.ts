@@ -10,94 +10,67 @@ export async function GET(req: NextRequest) {
     const { createClient } = await import("@/lib/supabase/server");
     const { db } = await import("@/lib/db");
 
-    type VoteType = "APPROVE" | "DISAPPROVE" | "NEUTRAL";
-
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const userId = user?.id;
 
-    const articles = await db.article.findMany({
+    // Fetch policies with their latest event
+    const policies = await db.policy.findMany({
       where: { isActive: true },
-      orderBy: { publishedAt: "desc" },
+      orderBy: { updatedAt: "desc" },
       include: {
-        comments: {
-          select: { id: true },
+        events: {
+          orderBy: { eventDate: "desc" },
+          take: 1,
         },
       },
     });
 
-    // Get user's votes and comments separately if authenticated
-    let userVotes: Record<string, string> = {};
-    let userComments: Set<string> = new Set();
+    // Map policies to article format for frontend compatibility
+    const articles = policies.map((policy) => {
+      const latestEvent = policy.events[0];
 
-    if (userId) {
-      const votes = await db.vote.findMany({
-        where: { userId },
-        select: { articleId: true, voteType: true },
-      });
-      userVotes = Object.fromEntries(
-        votes.map((v) => [v.articleId, v.voteType])
-      );
-
-      const comments = await db.comment.findMany({
-        where: { userId },
-        select: { articleId: true },
-      });
-      userComments = new Set(comments.map((c) => c.articleId));
-    }
-
-    // Get vote counts for all articles
-    const voteCounts = await db.vote.groupBy({
-      by: ["articleId", "voteType"],
-      _count: { id: true },
-    });
-
-    const voteCountMap: Record<
-      string,
-      { approve: number; disapprove: number; neutral: number }
-    > = {};
-    for (const vc of voteCounts) {
-      if (!voteCountMap[vc.articleId]) {
-        voteCountMap[vc.articleId] = { approve: 0, disapprove: 0, neutral: 0 };
-      }
-      if (vc.voteType === "APPROVE") {
-        voteCountMap[vc.articleId].approve = vc._count.id;
-      } else if (vc.voteType === "DISAPPROVE") {
-        voteCountMap[vc.articleId].disapprove = vc._count.id;
-      } else {
-        voteCountMap[vc.articleId].neutral = vc._count.id;
-      }
-    }
-
-    const articlesWithStats = articles.map((article) => {
-      const counts = voteCountMap[article.id] || {
-        approve: 0,
-        disapprove: 0,
-        neutral: 0,
+      // Determine "who should care" based on domain
+      const domainAudience: Record<string, string> = {
+        transit: "Commuters and transit riders",
+        education: "Students, parents, and educators",
+        housing: "Renters and homeowners",
+        budget: "PA taxpayers",
+        elections: "PA voters",
+        health: "Healthcare users",
+        environment: "Environmental advocates",
+        general: "PA residents",
       };
+
       return {
-        id: article.id,
-        title: article.title,
-        whoShouldCare: article.whoShouldCare,
-        summary: article.summary,
-        impact: article.impact,
-        sourceName: article.sourceName,
-        sourceUrl: article.sourceUrl,
-        category: article.category,
-        region: article.region,
-        publishedAt: article.publishedAt,
+        id: policy.id,
+        title: policy.title,
+        whoShouldCare: domainAudience[policy.domain] || "PA residents",
+        summary: latestEvent?.aiSummary || policy.description,
+        impact: policy.nextMilestone || latestEvent?.changeSummary || "Monitoring for updates",
+        sourceName: policy.sourceName,
+        sourceUrl: policy.sourceUrl,
+        category: policy.domain.charAt(0).toUpperCase() + policy.domain.slice(1),
+        region: policy.state,
+        publishedAt: policy.updatedAt,
         stats: {
-          approveCount: counts.approve,
-          disapproveCount: counts.disapprove,
-          neutralCount: counts.neutral,
-          commentCount: article.comments.length,
+          approveCount: 0,
+          disapproveCount: 0,
+          neutralCount: 0,
+          commentCount: 0,
         },
-        userVote: (userVotes[article.id] as VoteType) || null,
-        hasCommented: userComments.has(article.id),
+        userVote: null,
+        hasCommented: false,
+        // New policy-specific fields
+        status: policy.status,
+        shortTitle: policy.shortTitle,
+        changeSummary: latestEvent?.changeSummary,
       };
     });
 
-    return NextResponse.json({ articles: articlesWithStats });
+    return NextResponse.json({ articles });
   } catch (error) {
     console.error("Failed to fetch articles:", error);
     return NextResponse.json(
