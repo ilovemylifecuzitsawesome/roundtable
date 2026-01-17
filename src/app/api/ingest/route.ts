@@ -14,30 +14,36 @@ export async function POST(req: NextRequest) {
     const providedToken = authHeader?.replace("Bearer ", "");
 
     if (providedToken !== INGEST_SECRET) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Lazy imports
     const { db } = await import("@/lib/db");
-    const { fetchRSSFeed, fetchArticleContent, PA_NEWS_FEEDS } = await import("@/lib/ml/fetcher");
-    const { calculateRelevanceScore, detectRegion, detectCategory, summarizeArticle } = await import("@/lib/ml/summarizer");
+    const { fetchRSSFeed, PA_NEWS_FEEDS } = await import("@/lib/ml/fetcher");
+    const { summarizeWithClaude, hasAnthropicKey } = await import(
+      "@/lib/claude-summarizer"
+    );
 
-    const RELEVANCE_THRESHOLD = 0.3;
+    // Check for API key
+    if (!hasAnthropicKey()) {
+      return NextResponse.json(
+        { error: "ANTHROPIC_API_KEY not configured" },
+        { status: 500 }
+      );
+    }
+
     const results = {
       feedsInitialized: 0,
       articlesFetched: 0,
       articlesNew: 0,
-      articlesApproved: 0,
+      policiesCreated: 0,
+      eventsAdded: 0,
       articlesRejected: 0,
-      articlesSummarized: 0,
       errors: [] as string[],
     };
 
     // Step 1: Initialize feed sources
-    console.log("Initializing feed sources...");
+    console.log("📡 Initializing feed sources...");
     for (const feed of PA_NEWS_FEEDS) {
       await db.feedSource.upsert({
         where: { url: feed.url },
@@ -52,8 +58,8 @@ export async function POST(req: NextRequest) {
       results.feedsInitialized++;
     }
 
-    // Step 2: Fetch new articles
-    console.log("Fetching articles from RSS feeds...");
+    // Step 2: Fetch new articles from RSS feeds
+    console.log("📰 Fetching articles from RSS feeds...");
     const feeds = await db.feedSource.findMany({
       where: { isActive: true },
     });
@@ -92,124 +98,130 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Step 3: Score and filter articles
-    console.log("Scoring articles for relevance...");
+    // Step 3: Process pending articles with Claude
+    console.log("🤖 Processing articles with Claude...");
     const pendingArticles = await db.rawArticle.findMany({
       where: { status: "PENDING" },
-      take: 20,
+      orderBy: { createdAt: "asc" },
+      take: 10, // Process in batches to manage API costs
     });
 
-    for (const article of pendingArticles) {
+    for (const raw of pendingArticles) {
       try {
-        let content = article.sourceContent || "";
+        // Call Claude for smart summarization
+        const summary = await summarizeWithClaude(
+          raw.sourceTitle,
+          raw.sourceContent || "",
+          raw.sourceName
+        );
 
-        // Try to fetch full content if too short
-        if (content.length < 500) {
-          const fullContent = await fetchArticleContent(article.sourceUrl);
-          if (fullContent) {
-            content = fullContent;
-            await db.rawArticle.update({
-              where: { id: article.id },
-              data: { sourceContent: content },
-            });
-          }
-        }
-
-        const score = calculateRelevanceScore(article.sourceTitle, content);
-
-        if (score >= RELEVANCE_THRESHOLD) {
+        if (!summary) {
+          // Not policy-relevant, mark as rejected
           await db.rawArticle.update({
-            where: { id: article.id },
-            data: {
-              status: "APPROVED",
-              relevanceScore: score,
-              processedAt: new Date(),
-            },
-          });
-          results.articlesApproved++;
-        } else {
-          await db.rawArticle.update({
-            where: { id: article.id },
-            data: {
-              status: "REJECTED",
-              relevanceScore: score,
-              processedAt: new Date(),
-            },
+            where: { id: raw.id },
+            data: { status: "REJECTED", processedAt: new Date() },
           });
           results.articlesRejected++;
+          continue;
         }
-      } catch (error) {
+
+        // Check if policy already exists (by similar shortTitle)
+        let policy = await db.policy.findFirst({
+          where: {
+            OR: [
+              { shortTitle: summary.shortTitle },
+              { title: summary.title },
+            ],
+          },
+        });
+
+        if (policy) {
+          // Add event to existing policy
+          await db.policyEvent.create({
+            data: {
+              policyId: policy.id,
+              eventType: summary.status,
+              eventDate: raw.publishedAt || new Date(),
+              changeSummary: summary.changeSummary,
+              aiSummary: summary.aiSummary,
+              sources: JSON.stringify([
+                { title: raw.sourceName, url: raw.sourceUrl },
+              ]),
+            },
+          });
+
+          // Update policy status if changed
+          if (policy.status !== summary.status) {
+            await db.policy.update({
+              where: { id: policy.id },
+              data: {
+                status: summary.status,
+                nextMilestone: summary.nextMilestone,
+                updatedAt: new Date(),
+              },
+            });
+          }
+
+          results.eventsAdded++;
+        } else {
+          // Create new policy with initial event
+          policy = await db.policy.create({
+            data: {
+              title: summary.title,
+              shortTitle: summary.shortTitle,
+              description: summary.description,
+              domain: summary.domain,
+              status: summary.status,
+              nextMilestone: summary.nextMilestone,
+              sourceUrl: raw.sourceUrl,
+              sourceName: raw.sourceName,
+              events: {
+                create: {
+                  eventType: summary.status,
+                  eventDate: raw.publishedAt || new Date(),
+                  changeSummary: summary.changeSummary,
+                  aiSummary: summary.aiSummary,
+                  sources: JSON.stringify([
+                    { title: raw.sourceName, url: raw.sourceUrl },
+                  ]),
+                },
+              },
+            },
+          });
+
+          results.policiesCreated++;
+        }
+
+        // Mark raw article as processed
         await db.rawArticle.update({
-          where: { id: article.id },
+          where: { id: raw.id },
+          data: {
+            status: "PROCESSED",
+            processedAt: new Date(),
+            policyId: policy.id,
+          },
+        });
+
+        // Small delay to be nice to the API
+        await new Promise((r) => setTimeout(r, 500));
+      } catch (error) {
+        console.error(`❌ Failed to process: ${raw.sourceTitle}`, error);
+        await db.rawArticle.update({
+          where: { id: raw.id },
           data: {
             status: "ERROR",
             errorMessage: String(error),
             processedAt: new Date(),
           },
         });
-        results.errors.push(`Score ${article.id}: ${String(error)}`);
+        results.errors.push(`Process ${raw.id}: ${String(error)}`);
       }
     }
 
-    // Step 4: Summarize approved articles
-    console.log("Summarizing approved articles...");
-    const approvedArticles = await db.rawArticle.findMany({
-      where: { status: "APPROVED" },
-      take: 5,
-    });
-
-    for (const article of approvedArticles) {
-      try {
-        const content = article.sourceContent || "";
-        const region = detectRegion(article.sourceTitle, content);
-        const category = detectCategory(article.sourceTitle, content);
-
-        const summary = await summarizeArticle(
-          article.sourceTitle,
-          content,
-          region
-        );
-
-        const newArticle = await db.article.create({
-          data: {
-            title: summary.title,
-            whoShouldCare: summary.whoShouldCare,
-            summary: summary.summary,
-            impact: summary.impact,
-            sourceUrl: article.sourceUrl,
-            sourceName: article.sourceName,
-            category,
-            region,
-            publishedAt: article.publishedAt || new Date(),
-            isActive: true,
-          },
-        });
-
-        await db.rawArticle.update({
-          where: { id: article.id },
-          data: {
-            status: "SUMMARIZED",
-            articleId: newArticle.id,
-          },
-        });
-
-        results.articlesSummarized++;
-      } catch (error) {
-        await db.rawArticle.update({
-          where: { id: article.id },
-          data: {
-            status: "ERROR",
-            errorMessage: String(error),
-          },
-        });
-        results.errors.push(`Summarize ${article.id}: ${String(error)}`);
-      }
-    }
-
-    console.log("Ingestion complete:", results);
+    console.log("✅ Ingestion complete:", results);
     return NextResponse.json({ success: true, results });
   } catch (error) {
-    console.error("Ingestion failed:", error);
+    console.error("❌ Ingestion failed:", error);
     return NextResponse.json(
       { error: "Ingestion failed", message: String(error) },
       { status: 500 }
@@ -222,28 +234,27 @@ export async function GET() {
   try {
     const { db } = await import("@/lib/db");
 
-    const [
-      feedCount,
-      rawArticleCount,
-      pendingCount,
-      approvedCount,
-      articleCount,
-    ] = await Promise.all([
-      db.feedSource.count(),
-      db.rawArticle.count(),
-      db.rawArticle.count({ where: { status: "PENDING" } }),
-      db.rawArticle.count({ where: { status: "APPROVED" } }),
-      db.article.count(),
-    ]);
+    const [feedCount, rawPending, rawProcessed, rawRejected, policyCount, eventCount] =
+      await Promise.all([
+        db.feedSource.count(),
+        db.rawArticle.count({ where: { status: "PENDING" } }),
+        db.rawArticle.count({ where: { status: "PROCESSED" } }),
+        db.rawArticle.count({ where: { status: "REJECTED" } }),
+        db.policy.count(),
+        db.policyEvent.count(),
+      ]);
 
     return NextResponse.json({
       status: "ready",
       stats: {
         feedSources: feedCount,
-        rawArticles: rawArticleCount,
-        pendingArticles: pendingCount,
-        approvedArticles: approvedCount,
-        processedArticles: articleCount,
+        rawArticles: {
+          pending: rawPending,
+          processed: rawProcessed,
+          rejected: rawRejected,
+        },
+        policies: policyCount,
+        policyEvents: eventCount,
       },
     });
   } catch (error) {

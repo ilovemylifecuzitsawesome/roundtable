@@ -10,103 +10,153 @@ datasource db {
 
 // User profile (linked to Supabase Auth)
 model User {
-  id        String   @id
-  email     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id
+  email      String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   aliasType  String?
   aliasYears Int?
-  votes    Vote[]
-  comments Comment[]
-  follows  UserFollow[]
+
+  follows          Follow[]
+  lastSeenPolicies LastSeenPolicy[]
+  contributions    Contribution[]
+  digestSubscription DigestSubscription?
+}
+
+// Main entity: Policy (replaces Article)
+model Policy {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Core fields
+  state       String   @default("PA")  // Fixed to PA
+  domain      String   // transit, education, housing, budget, elections, health, environment, general
+  title       String   // Full policy title
+  shortTitle  String   // 5-7 word version for cards
+  description String   // 1-2 sentence neutral summary
+
+  // Status tracking
+  status      String   // INTRODUCED, COMMITTEE, HEARING_SCHEDULED, VOTE_SCHEDULED, PASSED, FAILED, SIGNED, ENACTED, IMPLEMENTED
+  nextMilestone     String?  // What happens next
+  nextMilestoneEta  DateTime?
+
+  // Source tracking
+  sourceUrl   String?
+  sourceName  String?
+
+  isActive    Boolean  @default(true)
+
+  // Relations
+  events      PolicyEvent[]
+  follows     Follow[]
+  lastSeen    LastSeenPolicy[]
+  rawArticles RawArticle[]
+}
+
+// Timeline nodes for each policy
+model PolicyEvent {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  policyId    String
+  policy      Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  // Event details
+  eventType   String   // INTRODUCED, COMMITTEE_REFERRAL, HEARING_SCHEDULED, AMENDED, VOTED, SIGNED, IMPLEMENTATION, GUIDANCE, LAWSUIT, OTHER
+  eventDate   DateTime
+  changeSummary String  // Short: what changed
+  aiSummary   String   // 2-3 sentence readable explanation
+
+  // Sources as JSON array: [{title, url}]
+  sources     String   @default("[]")
+
+  // Relations
+  contributions Contribution[]
+
+  @@index([policyId])
+  @@index([eventDate])
+}
+
+// User following a policy (max 3 per user)
+model Follow {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  policyId  String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policy    Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, policyId])
+}
+
+// Track what user has seen per policy
+model LastSeenPolicy {
+  id              String   @id @default(cuid())
+  updatedAt       DateTime @updatedAt
+  userId          String
+  policyId        String
+  lastSeenEventId String?  // Last event they've seen
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policy          Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, policyId])
+}
+
+// Constrained user contributions
+model Contribution {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  userId        String
+  policyEventId String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policyEvent   PolicyEvent @relation(fields: [policyEventId], references: [id], onDelete: Cascade)
+
+  // Contribution type and data
+  type    String  // CLARITY_VOTE, FLAG_INACCURATE, SUGGEST_SOURCE, SUGGEST_EDIT
+  payload String  // JSON: {vote: "clear"/"unclear"} or {note: "...", url: "..."}
+  status  String  @default("NEW")  // NEW, ACCEPTED, REJECTED
+
+  @@index([policyEventId])
+  @@index([status])
+}
+
+// Weekly digest subscription
+model DigestSubscription {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String   @unique
+  isEnabled Boolean  @default(true)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // Raw articles from RSS feeds (before processing)
 model RawArticle {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now())
-  sourceUrl   String   @unique
-  sourceName  String
-  sourceTitle String
+  id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now())
+  sourceUrl     String    @unique
+  sourceName    String
+  sourceTitle   String
   sourceContent String?
-  publishedAt DateTime?
-  status      String   @default("PENDING")
+  publishedAt   DateTime?
+  status        String    @default("PENDING")  // PENDING, PROCESSED, REJECTED, ERROR
   relevanceScore Float?
-  processedAt DateTime?
-  errorMessage String?
-  articleId   String?  @unique
-  article     Article? @relation(fields: [articleId], references: [id])
+  processedAt   DateTime?
+  errorMessage  String?
+
+  // Link to Policy (can be null if rejected)
+  policyId      String?
+  policy        Policy?   @relation(fields: [policyId], references: [id])
 }
 
-// Processed articles (shown to users)
-model Article {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  publishedAt DateTime @default(now())
-  title         String
-  whoShouldCare String
-  summary       String
-  impact        String
-  sourceUrl  String?
-  sourceName String?
-  category   String?
-  region     String?
-  isActive Boolean @default(true)
-
-  // Completion loop fields
-  policyStatus String?
-  policyStatusUpdatedAt DateTime?
-
-  rawArticle RawArticle?
-  votes      Vote[]
-  comments   Comment[]
-  follows    UserFollow[]
-}
-
-model Vote {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  voteType  String
-  userId    String
-  articleId String
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  @@unique([userId, articleId])
-}
-
-model Comment {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  content   String
-  userId    String
-  articleId String
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-}
-
+// RSS Feed sources
 model FeedSource {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  name      String
-  url       String   @unique
-  region    String?
-  category  String?
-  isActive  Boolean  @default(true)
+  id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  name          String
+  url           String    @unique
+  region        String?
+  category      String?
+  isActive      Boolean   @default(true)
   lastFetchedAt DateTime?
-}
-
-// For completion loop - users following articles
-model UserFollow {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  userId    String
-  articleId String
-  notifiedAt DateTime?
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  @@unique([userId, articleId])
 }
